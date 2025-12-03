@@ -1,3 +1,4 @@
+// client/src/App.jsx
 import React, { useState } from "react";
 
 export default function App() {
@@ -13,22 +14,46 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  async function getRecommendations() {
-    setLoading(true);
-    const res = await fetch("/recommend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ preferences: input, products })
-    });
+  // Use Vite env var for production base URL
+  const API_BASE = "https://product-recommender-1-3lr5.onrender.com";
 
-    const data = await res.json();
-    setResult(data);
-    setLoading(false);
+  async function getRecommendations() {
+    try {
+      setLoading(true);
+      setResult(null);
+
+      if (!API_BASE) {
+        throw new Error("API base URL is not configured. Set VITE_API_BASE environment variable.");
+      }
+
+      const res = await fetch(`${API_BASE}/recommend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: input, products })
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Server error ${res.status}: ${txt}`);
+      }
+
+      const data = await res.json();
+      if (!data || !Array.isArray(data.recommendedIds)) {
+        throw new Error("Invalid response shape from server");
+      }
+
+      setResult(data);
+    } catch (err) {
+      console.error("Recommendation error:", err);
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
-      <h1>AI Product Recommendation System</h1>
+    <div style={{ padding: 20, fontFamily: "Inter, Arial, sans-serif" }}>
+      <h1>AI Product Recommendation</h1>
 
       <textarea
         rows="3"
@@ -43,8 +68,8 @@ export default function App() {
         onClick={getRecommendations}
         disabled={loading}
         style={{
-          background: "blue", color: "white", padding: "10px 20px",
-          borderRadius: 8, cursor: "pointer"
+          background: "linear-gradient(90deg,#2563eb,#7c3aed)",
+          color: "white", padding: "10px 20px", borderRadius: 8, cursor: "pointer", border: "none"
         }}
       >
         {loading ? "Getting recommendations..." : "Recommend"}
@@ -67,9 +92,10 @@ export default function App() {
           <ul>
             {result.recommendedIds.map(id => {
               const prod = products.find(p => p.id === id);
+              if (!prod) return <li key={id} style={{ color: "orange" }}>{id} (not found)</li>;
               return (
                 <li key={id} style={{ color: "green" }}>
-                  {prod?.title} — ${prod?.price}
+                  {prod.title} — ${prod.price}
                 </li>
               );
             })}

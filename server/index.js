@@ -5,7 +5,13 @@ import Groq from "groq-sdk";
 
 dotenv.config();
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: "*", 
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
+}));
+
 app.use(express.json());
 
 const client = new Groq({
@@ -19,10 +25,15 @@ ${products.map(p => `${p.id}: ${p.title} ($${p.price}, tags: ${p.tags.join(", ")
 
 User preferences: ${preferences}
 
-Return ONLY JSON:
+Return ONLY valid JSON:
 {"recommendedIds":["p1","p3"], "explanation":"short reason"}
 `;
 }
+
+// 🔹 HEALTH CHECK ROUTE
+app.get("/", (req, res) => {
+  res.send("AI Recommendation API is running 🚀");
+});
 
 app.post("/recommend", async (req, res) => {
   try {
@@ -49,14 +60,13 @@ app.post("/recommend", async (req, res) => {
       if (match) parsed = JSON.parse(match[0]);
     }
 
-    if (!parsed || !parsed.recommendedIds) {
-      return res.json({
-        recommendedIds: [],
-        explanation: "Groq returned invalid JSON. Using fallback.",
-      });
-    }
+    // 🔹 SAFETY RETURN FORMAT
+    const safeJson = {
+      recommendedIds: parsed?.recommendedIds || [],
+      explanation: parsed?.explanation || "No explanation provided."
+    };
 
-    res.json(parsed);
+    return res.json(safeJson);
 
   } catch (err) {
     console.error("SERVER ERROR:", err);
